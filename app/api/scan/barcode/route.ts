@@ -5,10 +5,47 @@ import { calculateHealthScore } from '@/lib/healthScore';
 
 export async function POST(req: Request) {
   try {
-    const { barcode } = await req.json();
+    const body = await req.json();
+    const { barcode, customData } = body;
 
     if (!barcode) {
       return NextResponse.json({ error: 'Barcode is required' }, { status: 400 });
+    }
+
+    // A. Handle custom AI OCR product creation
+    if (customData) {
+      console.log(`[API Barcode] Creating custom product from OCR data: ${barcode}`);
+      const score = calculateHealthScore(customData.nutrition, customData.ingredients);
+      const newProduct: Product = {
+        id: barcode,
+        barcode,
+        name: customData.name || 'AI Scanned Product',
+        brand: customData.brand || 'Generic',
+        category: customData.category || 'Packaged Foods',
+        subcategory: customData.subcategory || 'General',
+        image_url: customData.image_url || '',
+        label_image_url: customData.label_image_url || '',
+        serving_size_g: parseFloat(customData.serving_size_g || '30'),
+        actual_serving_size_g: parseFloat(customData.serving_size_g || '30') * 1.5,
+        pack_size_g: parseFloat(customData.pack_size_g || '100'),
+        is_vegetarian: customData.is_vegetarian !== false,
+        is_vegan: customData.is_vegan || false,
+        is_gluten_free: !customData.ingredients.some((i: any) => i.allergen_type === 'gluten'),
+        health_score: score,
+        fssai_license: '',
+        manufacturer: '',
+        country_of_origin: 'India',
+        verified: false,
+        data_source: 'community'
+      };
+      
+      const savedProduct = await db.upsertProduct(newProduct, customData.nutrition, customData.ingredients);
+      return NextResponse.json({
+        ...(savedProduct || newProduct),
+        nutrition: customData.nutrition,
+        ingredients: customData.ingredients,
+        alternatives: []
+      });
     }
 
     // 1. Check database first

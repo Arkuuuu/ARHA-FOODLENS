@@ -23,6 +23,90 @@ export function ProductView({ barcode }: ProductViewProps) {
   const [logging, setLogging] = useState(false);
   const [loggedSuccess, setLoggedSuccess] = useState(false);
 
+  // OCR Contribution States
+  const [ocrLoading, setOcrLoading] = useState(false);
+  const [ocrResult, setOcrResult] = useState<any>(null);
+  const [ocrConfirmMode, setOcrConfirmMode] = useState(false);
+
+  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setOcrLoading(true);
+    try {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = async () => {
+        const base64 = reader.result as string;
+        const res = await fetch('/api/scan/ocr', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ image: base64 })
+        });
+        if (!res.ok) throw new Error("OCR parsing failed.");
+        const data = await res.json();
+        setOcrResult(data);
+        setOcrConfirmMode(true);
+      };
+    } catch (err: any) {
+      alert("Error parsing label: " + err.message);
+    } finally {
+      setOcrLoading(false);
+    }
+  };
+
+  const saveOcrProduct = async () => {
+    if (!ocrResult) return;
+    setOcrLoading(true);
+    try {
+      const res = await fetch('/api/scan/barcode', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ barcode, customData: ocrResult })
+      });
+      if (res.ok) {
+        const newProd = await res.json();
+        setProduct(newProd);
+        setOcrConfirmMode(false);
+        if (profile) {
+          const verdRes = await fetch('/api/scan/verdict', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ product: newProd, profile })
+          });
+          if (verdRes.ok) {
+            setVerdict(await verdRes.json());
+          }
+        }
+      }
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setOcrLoading(false);
+    }
+  };
+
+  const triggerMockOcr = async () => {
+    setOcrLoading(true);
+    try {
+      const res = await fetch('/api/scan/ocr', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ image: 'mock-base64-string' })
+      });
+      if (!res.ok) throw new Error("Mock OCR failed.");
+      const data = await res.json();
+      data.name = "Classic Salted Potato Chips";
+      data.brand = "Lay's";
+      setOcrResult(data);
+      setOcrConfirmMode(true);
+    } catch (e: any) {
+      alert(e.message);
+    } finally {
+      setOcrLoading(false);
+    }
+  };
+
   useEffect(() => {
     async function loadData() {
       try {
@@ -113,18 +197,123 @@ export function ProductView({ barcode }: ProductViewProps) {
 
   if (!product) {
     return (
-      <div className="w-full max-w-md mx-auto px-4 py-24 text-center">
-        <span className="text-5xl block mb-4">🔎</span>
-        <h2 className="font-display font-black text-2xl text-white">Product Not Found</h2>
-        <p className="text-slate-400 text-xs mt-2 mb-6">This barcode is not yet registered in our database.</p>
-        <div className="flex flex-col gap-2">
-          <Link href="/scan" className="py-3 bg-gradient-to-r from-emerald-500 to-emerald-400 text-black font-bold rounded-xl text-xs">
-            Try Scannng Again
+      <div className="w-full max-w-lg mx-auto px-4 py-12 flex flex-col gap-6 items-center text-center">
+        <span className="text-5xl block mb-2">🔎</span>
+        <div>
+          <h2 className="font-display font-black text-2xl text-white">Product Not Found</h2>
+          <p className="text-slate-400 text-xs mt-1 max-w-sm">Barcode <span className="font-mono text-slate-300 font-bold">{barcode}</span> is not yet in our database. Help us add it instantly using AI!</p>
+        </div>
+
+        <div className="w-full glass-card rounded-2xl p-6 border border-white/5 flex flex-col gap-4">
+          <h3 className="font-display font-extrabold text-sm text-white">📷 Snap Ingredients Label to Add</h3>
+          <p className="text-slate-400 text-[11px] leading-normal">
+            Take a photo of the ingredients list and nutrition facts of this product. Our AI will automatically parse the packet facts and add it.
+          </p>
+
+          <div className="flex flex-col gap-2">
+            <label className="w-full py-3.5 bg-slate-900 border border-dashed border-white/10 hover:border-emerald-500/40 rounded-xl flex items-center justify-center gap-2 text-xs font-bold text-slate-300 cursor-pointer transition-colors">
+              <span>📂</span> Take Photo / Upload Label
+              <input 
+                type="file" 
+                accept="image/*" 
+                capture="environment"
+                onChange={handlePhotoUpload} 
+                className="hidden" 
+              />
+            </label>
+            
+            <button
+              onClick={triggerMockOcr}
+              disabled={ocrLoading}
+              className="w-full py-3.5 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 hover:bg-emerald-500/20 rounded-xl text-xs font-bold transition-all cursor-pointer"
+            >
+              {ocrLoading ? 'Extracting via Gemini...' : '🚀 Test AI OCR (Auto-generate Lay\'s Chips Details)'}
+            </button>
+          </div>
+        </div>
+
+        <div className="flex gap-2 w-full">
+          <Link href="/scan" className="flex-1 py-3 bg-slate-900 border border-white/5 hover:bg-slate-800 rounded-xl text-slate-300 font-bold text-xs">
+            Try Another Barcode
           </Link>
-          <Link href="/" className="py-3 border border-white/5 hover:bg-white/5 text-slate-300 font-bold rounded-xl text-xs">
+          <Link href="/" className="flex-1 py-3 border border-white/5 hover:bg-white/5 text-slate-300 font-bold rounded-xl text-xs">
             Return Home
           </Link>
         </div>
+
+        {/* OCR Confirmation Modal */}
+        {ocrConfirmMode && ocrResult && (
+          <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-md flex items-center justify-center p-4">
+            <div className="w-full max-w-lg glass-card border border-white/10 rounded-2xl p-6 sm:p-8 animate-pop max-h-[90vh] overflow-y-auto">
+              <h3 className="font-display font-black text-xl text-white mb-2">🔍 Confirm Extracted Facts</h3>
+              <p className="text-slate-400 text-xs mb-6">Verify facts extracted by Gemini before calculation.</p>
+
+              <div className="flex flex-col gap-4 mb-6 text-left">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="flex flex-col gap-1">
+                    <span className="text-[10px] font-bold text-slate-500 uppercase">Product Name</span>
+                    <input 
+                      type="text" 
+                      value={ocrResult.name} 
+                      onChange={e => setOcrResult({...ocrResult, name: e.target.value})}
+                      className="bg-slate-900 border border-white/5 rounded-lg px-3 py-2 text-xs text-white" 
+                    />
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <span className="text-[10px] font-bold text-slate-500 uppercase">Brand</span>
+                    <input 
+                      type="text" 
+                      value={ocrResult.brand} 
+                      onChange={e => setOcrResult({...ocrResult, brand: e.target.value})}
+                      className="bg-slate-900 border border-white/5 rounded-lg px-3 py-2 text-xs text-white" 
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <span className="text-[10px] font-bold text-slate-500 uppercase">Nutrition Facts (per 100g)</span>
+                  <div className="grid grid-cols-3 gap-2 mt-1">
+                    <div className="bg-slate-900/60 p-2 rounded-lg border border-white/5 text-center">
+                      <span className="text-[9px] text-slate-500 block">Kcal</span>
+                      <span className="font-bold text-xs text-white">{ocrResult.nutrition?.energy_kcal || 0}</span>
+                    </div>
+                    <div className="bg-slate-900/60 p-2 rounded-lg border border-white/5 text-center">
+                      <span className="text-[9px] text-slate-500 block">Sugar (g)</span>
+                      <span className="font-bold text-xs text-white">{ocrResult.nutrition?.sugars_g || 0}</span>
+                    </div>
+                    <div className="bg-slate-900/60 p-2 rounded-lg border border-white/5 text-center">
+                      <span className="text-[9px] text-slate-500 block">Sodium (mg)</span>
+                      <span className="font-bold text-xs text-white">{ocrResult.nutrition?.sodium_mg || 0}</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <span className="text-[10px] font-bold text-slate-500 uppercase">Extracted Ingredients</span>
+                  <div className="p-3 bg-slate-900 border border-white/5 rounded-lg text-xs text-slate-300 leading-relaxed mt-1 max-h-[100px] overflow-y-auto">
+                    {ocrResult.ingredients?.map((i: any) => i.name).join(', ')}
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex gap-3">
+                <button 
+                  onClick={() => setOcrConfirmMode(false)}
+                  className="flex-1 py-3 border border-white/5 rounded-xl hover:bg-white/5 text-slate-300 font-bold text-sm cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button 
+                  onClick={saveOcrProduct}
+                  disabled={ocrLoading}
+                  className="flex-1 py-3 bg-gradient-to-r from-emerald-500 to-emerald-400 text-black font-bold text-sm rounded-xl cursor-pointer"
+                >
+                  {ocrLoading ? 'Generating...' : 'Confirm & Add Product ✨'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     );
   }
