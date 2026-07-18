@@ -147,9 +147,10 @@ export async function POST(req: Request) {
 
     // Save to database
     const savedProduct = await db.upsertProduct(newProduct, nutrition, parsedIngredients);
+    const resultProduct = savedProduct || newProduct;
 
     return NextResponse.json({
-      ...savedProduct,
+      ...resultProduct,
       nutrition,
       ingredients: parsedIngredients,
       alternatives: []

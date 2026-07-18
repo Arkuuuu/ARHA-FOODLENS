@@ -31,11 +31,19 @@ export default function ScanPage() {
           throw new Error("No camera found on this device.");
         }
 
+        // Select back camera if available, otherwise first device
+        const backCamera = videoDevices.find(d => 
+          d.label.toLowerCase().includes('back') || 
+          d.label.toLowerCase().includes('rear') || 
+          d.label.toLowerCase().includes('environment')
+        );
+        const deviceId = backCamera ? backCamera.deviceId : videoDevices[0].deviceId;
+
         setCameraPermission(true);
         setScanning(true);
 
         codeReader.decodeFromVideoDevice(
-          null, // auto-selects default back camera
+          deviceId,
           videoRef.current,
           (result, err) => {
             if (result) {

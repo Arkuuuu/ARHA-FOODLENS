@@ -501,11 +501,25 @@ async function seed() {
     // 1. Seed Harmful Substances
     console.log("Seeding harmful substances...");
     for (const sub of harmfulSubstances) {
-      const { data, error } = await supabase
+      const { data: existing, error: findError } = await supabase
         .from('harmful_substances')
-        .upsert(sub, { onConflict: 'name' })
-        .select();
-      if (error) throw error;
+        .select('id')
+        .eq('name', sub.name);
+      
+      if (findError) throw findError;
+
+      if (existing && existing.length > 0) {
+        const { error: updateError } = await supabase
+          .from('harmful_substances')
+          .update(sub)
+          .eq('id', existing[0].id);
+        if (updateError) throw updateError;
+      } else {
+        const { error: insertError } = await supabase
+          .from('harmful_substances')
+          .insert(sub);
+        if (insertError) throw insertError;
+      }
     }
     console.log(`Seeded ${harmfulSubstances.length} harmful substances.`);
 
@@ -518,9 +532,11 @@ async function seed() {
         const { data: subData } = await supabase
           .from('harmful_substances')
           .select('id')
-          .eq('e_number', ing.e_number)
-          .single();
-        if (subData) linkedSub = subData.id;
+          .eq('e_number', ing.e_number);
+        
+        if (subData && subData.length > 0) {
+          linkedSub = subData[0].id;
+        }
       }
       
       const payload = {
@@ -535,10 +551,25 @@ async function seed() {
         harmful_substance_id: linkedSub
       };
 
-      const { error } = await supabase
+      const { data: existing, error: findError } = await supabase
         .from('ingredient_encyclopedia')
-        .upsert(payload, { onConflict: 'name' });
-      if (error) throw error;
+        .select('id')
+        .eq('name', ing.name);
+
+      if (findError) throw findError;
+
+      if (existing && existing.length > 0) {
+        const { error: updateError } = await supabase
+          .from('ingredient_encyclopedia')
+          .update(payload)
+          .eq('id', existing[0].id);
+        if (updateError) throw updateError;
+      } else {
+        const { error: insertError } = await supabase
+          .from('ingredient_encyclopedia')
+          .insert(payload);
+        if (insertError) throw insertError;
+      }
     }
     console.log(`Seeded ${encyclopediaIngredients.length} encyclopedia ingredients.`);
 
