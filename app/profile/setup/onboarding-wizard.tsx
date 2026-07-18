@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 
 const HEALTH_CONDITIONS = [
@@ -65,11 +65,34 @@ export function OnboardingWizard() {
     conditions: [] as string[],
     allergies: [] as string[],
     dietary_type: 'non_veg',
-    goal: 'general',
+    goals: ['general'] as string[],
     medications: [] as string[],
     is_pregnant: false,
     pregnancy_week: 0
   });
+
+  useEffect(() => {
+    async function fetchProfile() {
+      try {
+        const res = await fetch('/api/user/profile');
+        if (res.ok) {
+          const data = await res.json();
+          setProfile(prev => ({
+            ...prev,
+            ...data,
+            goals: data.goals || (data.goal ? [data.goal] : ['general']),
+            // make sure numeric/string fields are populated correctly
+            age: data.age || '',
+            weight_kg: data.weight_kg || '',
+            height_cm: data.height_cm || ''
+          }));
+        }
+      } catch (e) {
+        console.error("Failed to load profile:", e);
+      }
+    }
+    fetchProfile();
+  }, []);
 
   const nextStep = () => setStep(prev => prev + 1);
   const prevStep = () => setStep(prev => Math.max(0, prev - 1));
@@ -94,6 +117,18 @@ export function OnboardingWizard() {
         allergies: active 
           ? prev.allergies.filter(a => a !== id)
           : [...prev.allergies, id]
+      };
+    });
+  };
+
+  const toggleGoal = (id: string) => {
+    setProfile(prev => {
+      const active = prev.goals?.includes(id) || false;
+      return {
+        ...prev,
+        goals: active 
+          ? prev.goals.filter(g => g !== id)
+          : [...(prev.goals || []), id]
       };
     });
   };
@@ -387,25 +422,28 @@ export function OnboardingWizard() {
       {step === 4 && (
         <div className="flex flex-col gap-6 animate-pop">
           <div>
-            <h2 className="font-display font-extrabold text-2xl text-white">What is your primary health goal?</h2>
-            <p className="text-slate-400 text-xs">Customizes metric visualizer priority on dashboard.</p>
+            <h2 className="font-display font-extrabold text-2xl text-white">What are your health goals?</h2>
+            <p className="text-slate-400 text-xs">Select all that apply. Customizes metric visualizer priority on dashboard.</p>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            {GOALS.map(g => (
-              <button
-                key={g.id}
-                onClick={() => setProfile({...profile, goal: g.id})}
-                className={`text-left p-4.5 rounded-xl border transition-all flex flex-col gap-1 cursor-pointer ${
-                  profile.goal === g.id 
-                    ? 'border-emerald-500 bg-emerald-500/10 text-white' 
-                    : 'border-white/5 bg-slate-900/40 hover:bg-slate-900 text-slate-300'
-                }`}
-              >
-                <span className="font-bold text-sm">{g.label}</span>
-                <span className="text-[11px] text-slate-400 leading-normal">{g.desc}</span>
-              </button>
-            ))}
+            {GOALS.map(g => {
+              const active = profile.goals?.includes(g.id) || false;
+              return (
+                <button
+                  key={g.id}
+                  onClick={() => toggleGoal(g.id)}
+                  className={`text-left p-4.5 rounded-xl border transition-all flex flex-col gap-1 cursor-pointer ${
+                    active 
+                      ? 'border-emerald-500 bg-emerald-500/10 text-white' 
+                      : 'border-white/5 bg-slate-900/40 hover:bg-slate-900 text-slate-300'
+                  }`}
+                >
+                  <span className="font-bold text-sm">{g.label}</span>
+                  <span className="text-[11px] text-slate-400 leading-normal">{g.desc}</span>
+                </button>
+              );
+            })}
           </div>
 
           <div className="flex gap-4 mt-4">

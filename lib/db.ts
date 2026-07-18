@@ -148,6 +148,9 @@ export const db = {
     if (isMockMode || !supabase) {
       console.log(`[DB Mock Mode] Searching products for query: ${query}`);
       const data = getLocalSeedData();
+      if (!query || query.toLowerCase() === 'all') {
+        return data.seedProducts.map((p: any) => ({ id: p.barcode, ...p }));
+      }
       const term = query.toLowerCase();
       const products = data.seedProducts.filter(
         (p: any) => p.name.toLowerCase().includes(term) || p.brand.toLowerCase().includes(term)
@@ -156,14 +159,16 @@ export const db = {
     }
 
     try {
-      const { data, error } = await supabase
-        .from('products')
-        .select(`
-          *,
-          nutrition (*)
-        `)
-        .or(`name.ilike.%${query}%,brand.ilike.%${query}%`)
-        .limit(20);
+      let q = supabase.from('products').select(`
+        *,
+        nutrition (*)
+      `);
+      
+      if (query && query.toLowerCase() !== 'all') {
+        q = q.or(`name.ilike.%${query}%,brand.ilike.%${query}%`);
+      }
+      
+      const { data, error } = await q.limit(50);
 
       if (error) throw error;
       return data || [];

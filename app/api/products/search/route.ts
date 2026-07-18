@@ -4,11 +4,7 @@ import { db } from '@/lib/db';
 export async function GET(req: Request) {
   try {
     const { searchParams } = new URL(req.url);
-    const query = searchParams.get('q') || '';
-
-    if (!query.trim()) {
-      return NextResponse.json([]);
-    }
+    const query = searchParams.get('q') || 'all';
 
     console.log(`[API Search] Searching for: ${query}`);
     const results = await db.searchProducts(query);

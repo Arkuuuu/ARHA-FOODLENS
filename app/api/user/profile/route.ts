@@ -53,8 +53,8 @@ export async function POST(req: Request) {
 
     if (updated.conditions?.includes('hypertension')) sodium = 1500;
     if (updated.conditions?.includes('diabetes') || updated.conditions?.includes('prediabetes')) sugar = 20;
-    if (updated.goal === 'weight_loss') calories = 1600;
-    else if (updated.goal === 'muscle_gain') calories = 2400;
+    if (updated.goals?.includes('weight_loss') || updated.goal === 'weight_loss') calories = 1600;
+    else if (updated.goals?.includes('muscle_gain') || updated.goal === 'muscle_gain') calories = 2400;
 
     updated.daily_sodium_limit_mg = sodium;
     updated.daily_sugar_limit_g = sugar;

@@ -54,6 +54,7 @@ export default function RootLayout({
           <nav className="hidden lg:flex items-center gap-6 text-sm font-medium text-slate-300">
             <Link href="/" className="hover:text-emerald-400 transition-colors">Home</Link>
             <Link href="/scan" className="hover:text-emerald-400 transition-colors bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 px-3.5 py-1.5 rounded-lg border border-emerald-500/20 transition-all">Quick Scan</Link>
+            <Link href="/products" className="hover:text-emerald-400 transition-colors">Products</Link>
             <Link href="/dashboard" className="hover:text-emerald-400 transition-colors">Dashboard</Link>
             <Link href="/diary" className="hover:text-emerald-400 transition-colors">Diary</Link>
             <Link href="/pantry" className="hover:text-emerald-400 transition-colors">Pantry Audit</Link>
